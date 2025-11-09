@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eye Analysis Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        h1,
+        h2 {
+            text-align: center;
+            color: #111;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+        }
+
+        .column {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            padding: 20px;
+            min-width: 680px;
+        }
+
+        /* Changed: The live stream is now in its own column */
+        img#video-stream {
+            width: 100%;
+            max-width: 640px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #000;
+        }
+
+        /* Changed: The captured image shows the processed 2x2 grid */
+        img#captured-image {
+            width: 100%;
+            max-width: 640px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #000;
+        }
+
+        pre {
+            background-color: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            /* Allows text to wrap */
+            word-wrap: break-word;
+        }
+
+        #capture-btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #capture-btn:hover {
+            background-color: #0056b3;
+        }
+
+        #capture-btn:active {
+            background-color: #004a99;
+            transform: translateY(1px);
+        }
+
+        #capture-status {
+            text-align: center;
+            margin-top: 10px;
+            font-style: italic;
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🧠 Eye Analysis Dashboard</h1>
+
+    <div class="container">
+        <div class="column">
+            <h2>Live Feed (Unprocessed)</h2>
+            <img id="video-stream" src="/video_feed" alt="Loading live stream...">
+
+        </div>
+
+        <div class="column">
+            <h2>Controls</h2>
+            <button id="capture-btn">📷 Capture & Analyze (Press Enter)</button>
+            <p id="capture-status"></p>
+
+            <h2>Last Capture (Processed)</h2>
+            <img id="captured-image" alt="Last captured frame" style="display:none;">
+            <h3>Captured Data:</h3>
+            <pre id="captured-report-data">No capture yet.</pre>
+        </div>
+    </div>
+
+    <script>
+        // REMOVED: The 'updateReportData' function and its 'setInterval' are gone.
+
+        // Function to handle the capture command
+        // This function is UNCHANGED but now does all the work.
+        async function captureFrame() {
+            const btn = document.getElementById('capture-btn');
+            const status = document.getElementById('capture-status');
+
+            btn.disabled = true;
+            btn.textContent = 'Capturing & Analyzing...';
+            status.textContent = 'Grabbing frame and processing...';
+
+            try {
+                const response = await fetch('/capture', { method: 'POST' });
+                if (!response.ok) throw new Error('Capture failed on server');
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Update the 'Last Capture' section
+                    const imgEl = document.getElementById('captured-image');
+                    // The image URL now points to the *processed 2x2 grid*
+                    imgEl.src = result.image_url + '?t=' + new Date().getTime();
+                    imgEl.style.display = 'block';
+
+                    const dataEl = document.getElementById('captured-report-data');
+                    dataEl.textContent = JSON.stringify(result.data, null, 2);
+
+                    status.textContent = `✅ Analysis complete! Capture saved.`;
+                } else {
+                    status.textContent = `❌ Error: ${result.error}`;
+                }
+
+            } catch (error) {
+                console.error('Error during capture:', error);
+                status.textContent = '❌ Capture failed. Check console.';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '📷 Capture & Analyze (Press Enter)';
+            }
+        }
+
+        // --- Event Listeners ---
+
+        // Listen for button click
+        document.getElementById('capture-btn').addEventListener('click', captureFrame);
+
+        // Listen for 'Enter' key press
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevent default 'Enter' behavior
+                // Only capture if the button isn't already working
+                if (!document.getElementById('capture-btn').disabled) {
+                    captureFrame();
+                }
+            }
+        });
+
+    </script>
+
+</body>
+
+</html>

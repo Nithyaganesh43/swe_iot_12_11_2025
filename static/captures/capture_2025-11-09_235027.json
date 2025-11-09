@@ -1,0 +1,36 @@
+{
+    "timestamp": "2025-11-09T23:50:27.467992",
+    "interpupillary_distance_px": 452.01,
+    "left_eye_box": {
+        "x": 588,
+        "y": 298,
+        "w": 298,
+        "h": 298
+    },
+    "right_eye_box": {
+        "x": 1042,
+        "y": 311,
+        "w": 282,
+        "h": 282
+    },
+    "left_eye_report": {
+        "pupil_center_x_rel": 159,
+        "pupil_center_y_rel": 167,
+        "pupil_diameter_px": 98,
+        "iris_diameter_px": 245,
+        "pi_ratio": 0.4,
+        "redness_index": 1.094,
+        "dryness_index": 36.606,
+        "reflection_pixels": 171
+    },
+    "right_eye_report": {
+        "pupil_center_x_rel": 157,
+        "pupil_center_y_rel": 157,
+        "pupil_diameter_px": 94,
+        "iris_diameter_px": 235,
+        "pi_ratio": 0.4,
+        "redness_index": 1.201,
+        "dryness_index": 0.0,
+        "reflection_pixels": 0
+    }
+}
