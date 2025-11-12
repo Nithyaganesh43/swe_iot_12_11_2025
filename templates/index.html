@@ -6,63 +6,65 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eye Analysis Dashboard</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f0f2f5;
-            margin: 0;
-            padding: 20px;
-            color: #333;
+        :root {
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --text-light: #666;
+            --border-color: #e0e0e0;
+            --primary-color: #007bff;
+            --primary-hover: #0056b3;
+            --danger-color: #dc3545;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            --border-radius: 8px;
         }
 
-        h1,
-        h2 {
-            text-align: center;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 24px;
+            color: var(--text-color);
+        }
+
+        h1, h2, h3 {
+            margin-top: 0;
             color: #111;
         }
 
-        .container {
+        .main-container {
             display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 30px;
+            gap: 24px;
+            max-width: 1600px;
+            margin: 0 auto;
         }
 
         .column {
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            padding: 20px;
-            min-width: 680px;
+            background-color: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
         }
 
-        /* Changed: The live stream is now in its own column */
-        img#video-stream {
+        .column-left {
+            flex: 1;
+            min-width: 400px;
+            max-width: 680px;
+        }
+
+        .column-right {
+            flex: 2;
+            min-width: 500px;
+        }
+
+        /* --- Left Column: Stream & Controls --- */
+        #video-stream {
             width: 100%;
-            max-width: 640px;
-            border: 1px solid #ddd;
             border-radius: 4px;
             background-color: #000;
-        }
-
-        /* Changed: The captured image shows the processed 2x2 grid */
-        img#captured-image {
-            width: 100%;
-            max-width: 640px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: #000;
-        }
-
-        pre {
-            background-color: #fafafa;
-            border: 1px solid #eee;
-            border-radius: 4px;
-            padding: 15px;
-            font-family: "Courier New", Courier, monospace;
-            font-size: 14px;
-            white-space: pre-wrap;
-            /* Allows text to wrap */
-            word-wrap: break-word;
+            border: 1px solid var(--border-color);
         }
 
         #capture-btn {
@@ -72,115 +74,520 @@
             font-size: 18px;
             font-weight: bold;
             color: #fff;
-            background-color: #007bff;
+            background-color: var(--primary-color);
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: background-color 0.2s, opacity 0.2s;
+            margin-top: 16px;
         }
 
         #capture-btn:hover {
-            background-color: #0056b3;
+            background-color: var(--primary-hover);
         }
 
-        #capture-btn:active {
-            background-color: #004a99;
-            transform: translateY(1px);
+        #capture-btn:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        #capture-btn.loading {
+            background-color: #ffc107;
+            color: #333;
         }
 
         #capture-status {
             text-align: center;
-            margin-top: 10px;
-            font-style: italic;
-            color: #555;
+            margin-top: 12px;
+            font-size: 14px;
+            min-height: 1.2em;
         }
+        #capture-status.error { color: var(--danger-color); font-weight: bold; }
+        #capture-status.success { color: var(--success-color); font-weight: bold; }
+
+
+        /* --- Right Column: Tabs & Reports --- */
+        .tab-nav {
+            display: flex;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-light);
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .tab-btn.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* --- Current Report Tab --- */
+        #report-placeholder {
+            text-align: center;
+            font-size: 18px;
+            color: var(--text-light);
+            padding: 80px 20px;
+            border: 2px dashed var(--border-color);
+            border-radius: var(--border-radius);
+        }
+        
+        #captured-image {
+            width: 100%;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        /* Insightful Report Styles */
+        #report-insights h3 {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-bottom: 16px;
+        }
+        .insights-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .insight-card {
+            background: var(--bg-color);
+            padding: 16px;
+            border-radius: 6px;
+        }
+        .insight-card .status {
+            font-weight: bold;
+        }
+        .status.good { color: var(--success-color); }
+        .status.warn { color: var(--warning-color); }
+        .status.bad { color: var(--danger-color); }
+
+        .metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+        .metrics-table th, .metrics-table td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .metrics-table th {
+            background-color: var(--bg-color);
+        }
+        .metrics-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Raw Data Toggle */
+        details {
+            margin-top: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+        }
+        summary {
+            padding: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            background: var(--bg-color);
+        }
+        pre {
+            background-color: #fafafa;
+            border-top: 1px solid var(--border-color);
+            padding: 15px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+        }
+        
+        /* --- History Tab --- */
+        #history-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        #history-list li {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #history-list li:hover {
+            background-color: var(--bg-color);
+        }
+        #history-list li:last-child {
+            border-bottom: none;
+        }
+        #history-list li .time-text {
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        #history-list li .date-text {
+            font-size: 14px;
+            color: var(--text-light);
+            margin-left: auto;
+        }
+
+        /* --- Responsive Design --- */
+        @media (max-width: 1200px) {
+            .main-container {
+                flex-direction: column;
+            }
+            .column-left, .column-right {
+                flex: 1;
+                max-width: none;
+            }
+        }
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            .column { padding: 16px; }
+            .insights-grid { grid-template-columns: 1fr; }
+            .tab-btn { padding: 10px 15px; font-size: 14px; }
+        }
+
     </style>
 </head>
 
 <body>
 
-    <h1>🧠 Eye Analysis Dashboard</h1>
+    <header>
+        <h1>Eye Analysis Dashboard</h1>
+    </header>
 
-    <div class="container">
-        <div class="column">
-            <h2>Live Feed (Unprocessed)</h2>
+    <div class="main-container">
+
+        <div class="column column-left">
+            <h2>Live Feed</h2>
             <img id="video-stream" src="/video_feed" alt="Loading live stream...">
-
-        </div>
-
-        <div class="column">
-            <h2>Controls</h2>
+            
             <button id="capture-btn">📷 Capture & Analyze (Press Enter)</button>
             <p id="capture-status"></p>
+        </div>
 
-            <h2>Last Capture (Processed)</h2>
-            <img id="captured-image" alt="Last captured frame" style="display:none;">
-            <h3>Captured Data:</h3>
-            <pre id="captured-report-data">No capture yet.</pre>
+        <div class="column column-right">
+            <nav class="tab-nav">
+                <button class="tab-btn active" data-tab="report">Current Report</button>
+                <button class="tab-btn" data-tab="history">Capture History</button>
+            </nav>
+
+            <div id="tab-report" class="tab-content active">
+                <div id="report-placeholder">
+                    <p>Press "Capture & Analyze" to see your report.</p>
+                </div>
+
+                <div id="report-content" style="display:none;">
+                    <h2>Processed Capture</h2>
+                    <img id="captured-image" alt="Last captured frame">
+                    
+                    <div id="report-insights">
+                        </div>
+
+                    <details>
+                        <summary>Show Raw JSON Data</summary>
+                        <pre id="captured-report-data">No data yet.</pre>
+                    </details>
+                </div>
+            </div>
+
+            <div id="tab-history" class="tab-content">
+                <h2>Capture History</h2>
+                <ul id="history-list">
+                    <li id="history-loading">Loading history...</li>
+                </ul>
+            </div>
         </div>
     </div>
 
     <script>
-        // REMOVED: The 'updateReportData' function and its 'setInterval' are gone.
+        document.addEventListener('DOMContentLoaded', () => {
 
-        // Function to handle the capture command
-        // This function is UNCHANGED but now does all the work.
-        async function captureFrame() {
-            const btn = document.getElementById('capture-btn');
-            const status = document.getElementById('capture-status');
+            // --- Element References ---
+            const captureBtn = document.getElementById('capture-btn');
+            const captureStatus = document.getElementById('capture-status');
+            const capturedImage = document.getElementById('captured-image');
+            const reportDataEl = document.getElementById('captured-report-data');
+            const reportPlaceholder = document.getElementById('report-placeholder');
+            const reportContent = document.getElementById('report-content');
+            const reportInsights = document.getElementById('report-insights');
+            const historyList = document.getElementById('history-list');
+            const historyLoading = document.getElementById('history-loading');
 
-            btn.disabled = true;
-            btn.textContent = 'Capturing & Analyzing...';
-            status.textContent = 'Grabbing frame and processing...';
+            const tabs = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
 
-            try {
-                const response = await fetch('/capture', { method: 'POST' });
-                if (!response.ok) throw new Error('Capture failed on server');
+            // --- Tab Navigation ---
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Deactivate all
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(c => c.classList.remove('active'));
 
-                const result = await response.json();
+                    // Activate clicked
+                    tab.classList.add('active');
+                    document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+                });
+            });
 
-                if (result.success) {
-                    // Update the 'Last Capture' section
-                    const imgEl = document.getElementById('captured-image');
-                    // The image URL now points to the *processed 2x2 grid*
-                    imgEl.src = result.image_url + '?t=' + new Date().getTime();
-                    imgEl.style.display = 'block';
+            function showTab(tabName) {
+                document.querySelector(`.tab-btn[data-tab="${tabName}"]`).click();
+            }
 
-                    const dataEl = document.getElementById('captured-report-data');
-                    dataEl.textContent = JSON.stringify(result.data, null, 2);
+            // --- Capture Logic ---
+            async function captureFrame() {
+                captureBtn.disabled = true;
+                captureBtn.textContent = 'Analyzing...';
+                captureBtn.classList.add('loading');
+                captureStatus.textContent = 'Processing frame...';
+                captureStatus.className = '';
 
-                    status.textContent = `✅ Analysis complete! Capture saved.`;
-                } else {
-                    status.textContent = `❌ Error: ${result.error}`;
+                try {
+                    const response = await fetch('/capture', { method: 'POST' });
+                    if (!response.ok) throw new Error(`Server error: ${response.statusText}`);
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        captureStatus.textContent = `✅ Analysis complete!`;
+                        captureStatus.className = 'success';
+                        
+                        // Show the report content, hide placeholder
+                        reportPlaceholder.style.display = 'none';
+                        reportContent.style.display = 'block';
+
+                        // 1. Update Image
+                        capturedImage.src = result.image_url + '?t=' + new Date().getTime();
+
+                        // 2. Update Raw Data
+                        reportDataEl.textContent = JSON.stringify(result.data, null, 2);
+                        
+                        // 3. Render Insightful Report
+                        renderInsights(result.data);
+
+                        // 4. Refresh history and switch to report tab
+                        loadHistory();
+                        showTab('report');
+
+                    } else {
+                        captureStatus.textContent = `❌ Error: ${result.error}`;
+                        captureStatus.className = 'error';
+                    }
+
+                } catch (error) {
+                    console.error('Error during capture:', error);
+                    captureStatus.textContent = '❌ Capture failed. Check console.';
+                    captureStatus.className = 'error';
+                } finally {
+                    captureBtn.disabled = false;
+                    captureBtn.textContent = '📷 Capture & Analyze (Press Enter)';
+                    captureBtn.classList.remove('loading');
+                }
+            }
+
+            // --- Insightful Report Renderer ---
+            function renderInsights(data) {
+                const left = data.left_eye_report;
+                const right = data.right_eye_report;
+                
+                // Helper to get status class
+                const getRednessStatus = (value) => {
+                    if (value > 1.3) return { class: 'bad', text: 'High' };
+                    if (value > 1.1) return { class: 'warn', text: 'Moderate' };
+                    return { class: 'good', text: 'Normal' };
+                };
+                
+                const getDrynessStatus = (value) => {
+                    if (value > 800) return { class: 'bad', text: 'High' };
+                    if (value > 500) return { class: 'warn', text: 'Moderate' };
+                    return { class: 'good', text: 'Low' };
+                };
+                
+                const leftRed = getRednessStatus(left.redness_index);
+                const rightRed = getRednessStatus(right.redness_index);
+                const leftDry = getDrynessStatus(left.dryness_index);
+                const rightDry = getDrynessStatus(right.dryness_index);
+
+                // Pupil Symmetry
+                const pupilDiff = Math.abs(left.pupil_diameter_px - right.pupil_diameter_px);
+                const avgPupil = (left.pupil_diameter_px + right.pupil_diameter_px) / 2;
+                const pupilDiffPercent = (pupilDiff / avgPupil) * 100;
+                let pupilSymmetry = { class: 'good', text: 'Symmetrical' };
+                if (pupilDiffPercent > 15) {
+                    pupilSymmetry = { class: 'bad', text: 'Asymmetrical (Anisocoria)' };
+                } else if (pupilDiffPercent > 8) {
+                    pupilSymmetry = { class: 'warn', text: 'Slightly Asymmetrical' };
                 }
 
-            } catch (error) {
-                console.error('Error during capture:', error);
-                status.textContent = '❌ Capture failed. Check console.';
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '📷 Capture & Analyze (Press Enter)';
+                let html = `
+                    <h3>Analysis Insights</h3>
+                    <div class="insights-grid">
+                        <div class="insight-card">
+                            <strong>Pupil Symmetry</strong>
+                            <p>Pupils appear <span class="status ${pupilSymmetry.class}">${pupilSymmetry.text}</span>.</p>
+                            <small>Left: ${left.pupil_diameter_px}px, Right: ${right.pupil_diameter_px}px (${pupilDiffPercent.toFixed(1)}% difference)</small>
+                        </div>
+                        <div class="insight-card">
+                            <strong>Sclera Redness</strong>
+                            <p>Left: <span class="status ${leftRed.class}">${leftRed.text}</span>. Right: <span class="status ${rightRed.class}">${rightRed.text}</span>.</p>
+                            <small>This indicates potential irritation or strain if high.</small>
+                        </div>
+                        <div class="insight-card">
+                            <strong>Dryness Index</strong>
+                             <p>Left: <span class="status ${leftDry.class}">${leftDry.text}</span>. Right: <span class="status ${rightDry.class}">${rightDry.text}</span>.</p>
+                            <small>Based on tear film reflections. High values may indicate dryness or just more light reflection.</small>
+                        </div>
+                        <div class="insight-card">
+                            <strong>Interpupillary Distance (IPD)</strong>
+                            <p><span class="status">${data.interpupillary_distance_px.toFixed(0)} px</span></p>
+                            <small>This is a pixel measurement, not a clinical 'mm' value.</small>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top: 24px;">Metrics Breakdown</h3>
+                    <table class="metrics-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Left Eye</th>
+                                <th>Right Eye</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Pupil Diameter</strong></td>
+                                <td>${left.pupil_diameter_px} px</td>
+                                <td>${right.pupil_diameter_px} px</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Pupil/Iris Ratio</strong></td>
+                                <td>${left.pi_ratio}</td>
+                                <td>${right.pi_ratio}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Redness Index</strong></td>
+                                <td class="${leftRed.class}">${left.redness_index}</td>
+                                <td class="${rightRed.class}">${right.redness_index}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Dryness Index</strong></td>
+                                <td class="${leftDry.class}">${left.dryness_index}</td>
+                                <td class="${rightDry.class}">${right.dryness_index}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
+                reportInsights.innerHTML = html;
             }
-        }
 
-        // --- Event Listeners ---
+            // --- History Dashboard Logic ---
+            async function loadHistory() {
+                try {
+                    const response = await fetch('/get_captures');
+                    const captures = await response.json();
 
-        // Listen for button click
-        document.getElementById('capture-btn').addEventListener('click', captureFrame);
+                    historyList.innerHTML = ''; // Clear list (including loading)
+                    
+                    if (captures.length === 0) {
+                        historyList.innerHTML = '<li>No captures found yet.</li>';
+                        return;
+                    }
 
-        // Listen for 'Enter' key press
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                event.preventDefault(); // Prevent default 'Enter' behavior
-                // Only capture if the button isn't already working
-                if (!document.getElementById('capture-btn').disabled) {
+                    captures.forEach(capture => {
+                        const li = document.createElement('li');
+                        
+                        // Split display time for better layout
+                        const [date, ...timeParts] = capture.display_time.split(' ');
+                        const time = timeParts.join(' ');
+                        
+                        li.innerHTML = `
+                            <div>
+                                <div class="time-text">${time}</div>
+                                <div class="date-text">${date}</div>
+                            </div>
+                        `;
+                        // Add click listener to load this capture
+                        li.addEventListener('click', () => {
+                            loadCaptureFromHistory(capture.json_url, capture.image_url);
+                        });
+                        historyList.appendChild(li);
+                    });
+
+                } catch (error) {
+                    console.error('Error loading history:', error);
+                    historyList.innerHTML = '<li>Error loading history.</li>';
+                }
+            }
+
+            async function loadCaptureFromHistory(jsonUrl, imageUrl) {
+                try {
+                    // Show a loading state in the report
+                    reportPlaceholder.style.display = 'none';
+                    reportContent.style.display = 'block';
+                    reportInsights.innerHTML = '<h3>Loading historical report...</h3>';
+                    capturedImage.src = '';
+                    reportDataEl.textContent = 'Loading...';
+                    showTab('report');
+
+                    const response = await fetch(jsonUrl + '?t=' + new Date().getTime());
+                    const data = await response.json();
+                    
+                    if ("error" in data) {
+                        reportInsights.innerHTML = `<h3 class="status bad">Error loading report: ${data.error}</h3>`;
+                        return;
+                    }
+
+                    // Success: Render the old data
+                    capturedImage.src = imageUrl + '?t=' + new Date().getTime();
+                    reportDataEl.textContent = JSON.stringify(data, null, 2);
+                    renderInsights(data);
+                    
+                    captureStatus.textContent = `Viewing capture from ${new Date(data.timestamp).toLocaleString()}`;
+                    captureStatus.className = '';
+
+                } catch (error) {
+                    console.error('Error loading capture from history:', error);
+                    reportInsights.innerHTML = `<h3 class="status bad">Failed to fetch report data.</h3>`;
+                }
+            }
+
+
+            // --- Event Listeners ---
+            captureBtn.addEventListener('click', captureFrame);
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && !captureBtn.disabled) {
+                    event.preventDefault();
                     captureFrame();
                 }
-            }
-        });
+            });
 
+            // --- Initial Load ---
+            loadHistory();
+
+        });
     </script>
 
 </body>
-
 </html>
