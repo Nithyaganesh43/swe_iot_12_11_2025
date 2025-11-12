@@ -11,8 +11,7 @@ import time
 
 # --- CONFIGURATION ---
 # We are locked to the webcam as requested
-VIDEO_SOURCE = 0                                    # Use local webcam
-# VIDEO_SOURCE = "http://192.168.1.4:8080/video"      # Use ESP32 Stream 1
+# VIDEO_SOURCE = 0                                    # Use local webcam
 # VIDEO_SOURCE = "http://10.225.59.111/stream"        # Use ESP32 Stream 2
 
 # --- AI MODEL LOADING ---
