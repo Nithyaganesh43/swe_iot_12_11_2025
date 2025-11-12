@@ -8,15 +8,16 @@ from flask import Flask, Response, render_template, jsonify, send_from_directory
 import threading
 import time
 
+
 # --- CONFIGURATION ---
 # We are locked to the webcam as requested
-# VIDEO_SOURCE = 0                                    # Use local webcam
+VIDEO_SOURCE = 0                                    # Use local webcam
 # VIDEO_SOURCE = "http://192.168.1.4:8080/video"      # Use ESP32 Stream 1
-VIDEO_SOURCE = "http://10.225.59.111/stream"        # Use ESP32 Stream 2
+# VIDEO_SOURCE = "http://10.225.59.111/stream"        # Use ESP32 Stream 2
 
 # --- AI MODEL LOADING ---
 FACE_CASCADE_PATH = 'haarcascade_frontalface_default.xml'
-EYE_CASCADE_PATH = 'haarcascade_eye.xml' 
+EYE_CASCADE_PATH = 'haarcascade_eye.xml'
 
 if not os.path.exists(EYE_CASCADE_PATH) or not os.path.exists(FACE_CASCADE_PATH):
     print(f"❌ ERROR: Cannot find cascade files.")
@@ -36,6 +37,8 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0 # Disable caching
 # --- THREAD-SAFE FRAME STORAGE ---
 latest_frame_bytes = None
 frame_lock = threading.Lock()
+# BUG 3 FIX: Add a lock to prevent file save race conditions in /capture
+capture_lock = threading.Lock()
 
 # --- BACKGROUND THREADS ---
 
@@ -49,25 +52,27 @@ def read_from_url(stream_url):
     print(f"🌎 Starting URL stream reader thread for {stream_url}...")
     
     while True:
+        # BUG 1 FIX: Use a 'with' statement to ensure the request session
+        # is automatically closed on error or completion, preventing leaks.
         try:
-            r = requests.get(stream_url, stream=True, timeout=10.0)
-            r.raise_for_status()
-            print("✅ (Thread) Stream connection established.")
-            
-            stream_bytes = b''
-            
-            for chunk in r.iter_content(chunk_size=1024):
-                stream_bytes += chunk
-                a = stream_bytes.find(b'\xff\xd8') # Start of JPEG
-                b = stream_bytes.find(b'\xff\xd9') # End of JPEG
+            with requests.get(stream_url, stream=True, timeout=10.0) as r:
+                r.raise_for_status()
+                print("✅ (Thread) Stream connection established.")
                 
-                if a != -1 and b != -1:
-                    jpg = stream_bytes[a:b+2]
-                    with frame_lock:
-                        latest_frame_bytes = jpg
-                    stream_bytes = stream_bytes[b+2:]
-            
-            print("❌ (Thread) Stream ended unexpectedly. Reconnecting in 5s...")
+                stream_bytes = b''
+                
+                for chunk in r.iter_content(chunk_size=1024):
+                    stream_bytes += chunk
+                    a = stream_bytes.find(b'\xff\xd8') # Start of JPEG
+                    b = stream_bytes.find(b'\xff\xd9') # End of JPEG
+                    
+                    if a != -1 and b != -1:
+                        jpg = stream_bytes[a:b+2]
+                        with frame_lock:
+                            latest_frame_bytes = jpg
+                        stream_bytes = stream_bytes[b+2:]
+                
+                print("❌ (Thread) Stream ended unexpectedly. Reconnecting in 5s...")
 
         except requests.exceptions.ConnectionError as e:
             print(f"❌ (Thread) Connection Error: {e}. Retrying in 5s...")
@@ -267,7 +272,6 @@ def analyze_single_eye(eye_roi_gray, eye_roi_color):
     
     ret, reflection_map_full = cv2.threshold(eye_roi_gray, 190, 255, cv2.THRESH_BINARY)
     reflection_map = cv2.bitwise_and(reflection_map_full, reflection_map_full, mask=iris_mask)
-    
     reflection_pixels = np.sum(reflection_map == 255)
     iris_pixels = np.sum(iris_mask == 255)
     
@@ -286,8 +290,8 @@ def analyze_single_eye(eye_roi_gray, eye_roi_color):
     }
     
     red_channel_img = cv2.applyColorMap(eye_roi_color[:, :, 2], cv2.COLORMAP_HOT)
-    reflection_map_img = cv2.cvtColor(reflection_map, cv2.COLOR_GRAY2BGR)
     sclera_mask_img = cv2.cvtColor(sclera_mask, cv2.COLOR_GRAY2BGR)
+    reflection_map_img = cv2.cvtColor(reflection_map, cv2.COLOR_GRAY2BGR)
     
     return report, overlay_img, red_channel_img, reflection_map_img, sclera_mask_img
 
@@ -311,7 +315,6 @@ def process_frame(frame: np.ndarray) -> (np.ndarray, dict):
     
     # --- Step 2: Detect Eyes *within* the Face ROI ---
     face_roi_gray = gray[fy:fy+fh, fx:fx+fw]
-    
     eyes = eye_cascade.detectMultiScale(face_roi_gray, scaleFactor=1.1, minNeighbors=8, minSize=(fw//6, fh//6)) 
     
     if len(eyes) != 2:
@@ -438,6 +441,7 @@ def process_frame(frame: np.ndarray) -> (np.ndarray, dict):
         y_offset += 25
 
     # --- Step 9: Combine all parts ---
+    # FIX: Removed the stray 'N' from the beginning of this line
     output_image = np.vstack((top_half, bottom_half, report_strip))
     
     # --- Step 10: Create Final JSON Report ---
@@ -458,7 +462,10 @@ def process_frame(frame: np.ndarray) -> (np.ndarray, dict):
 def index():
     """Renders the main HTML page."""
     return render_template('index.html')
-
+@app.route('/analysis')
+def analysis_page():
+    """Renders the analysis dashboard HTML page."""
+    return render_template('analysis.html')
 def create_offline_jpeg():
     """Helper to create a JPEG byte array for offline/error state."""
     img = np.ones((240, 320, 3), dtype=np.uint8) * 100
@@ -475,22 +482,39 @@ def generate_frames():
     """
     offline_jpg = create_offline_jpeg()
     
+    # BUG 2 FIX: Hold the last valid frame for a few seconds to prevent
+    # the "offline" image from flickering during short reconnects.
+    last_valid_frame_bytes = None
+    last_valid_time = 0.0
+    hold_duration_seconds = 3.0 # Hold last frame for 3 seconds
+    
     while True:
-        frame_bytes = None
+        current_frame_bytes = None
         
         with frame_lock:
-            if latest_frame_bytes is not None:
-                frame_bytes = latest_frame_bytes
+            current_frame_bytes = latest_frame_bytes
         
-        if frame_bytes is None:
-            if offline_jpg:
-                frame_bytes = offline_jpg
-            else:
-                time.sleep(0.5)
-                continue
+        frame_to_send = None
+        
+        if current_frame_bytes is not None:
+            # Case 1: Stream is live. Send the current frame.
+            frame_to_send = current_frame_bytes
+            last_valid_frame_bytes = current_frame_bytes # Cache this as the last good frame
+            last_valid_time = time.time()
+        elif last_valid_frame_bytes is not None and (time.time() - last_valid_time) < hold_duration_seconds:
+            # Case 2: Stream is down, but we are within the hold duration.
+            frame_to_send = last_valid_frame_bytes # Send the stale (last good) frame.
+        else:
+            # Case 3: Stream is down and hold time is over, or stream was never up.
+            frame_to_send = offline_jpg
+        
+        if frame_to_send is None:
+            # Fallback just in case offline_jpg failed to create
+            time.sleep(0.5)
+            continue
         
         yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_to_send + b'\r\n')
         
         time.sleep(0.05) # ~20 FPS
 
@@ -533,29 +557,37 @@ def capture():
     if processed_img is None:
         return jsonify({"success": False, "error": "Failed to process frame."})
 
-    now_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    img_filename = f"capture_{now_str}.jpg"
-    data_filename = f"capture_{now_str}.json"
-    
-    # Create the 'static/captures' directory if it doesn't exist
-    capture_dir = os.path.join('static', 'captures')
-    os.makedirs(capture_dir, exist_ok=True)
-    
-    img_save_path = os.path.join(capture_dir, img_filename)
-    data_save_path = os.path.join(capture_dir, data_filename)
-    
-    cv2.imwrite(img_save_path, processed_img)
-    
-    with open(data_save_path, 'w') as f:
-        json.dump(report_data, f, indent=4)
+    # BUG 3 FIX: Use the capture_lock to ensure only one thread
+    # can write files at a time, preventing a race condition if
+    # /capture is called twice in the same second.
+    with capture_lock:
+        now_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        img_filename = f"capture_{now_str}.jpg"
+        data_filename = f"capture_{now_str}.json"
         
-    print(f"✅ Capture saved: {img_filename} and {data_filename}")
+        # Create the 'static/captures' directory if it doesn't exist
+        capture_dir = os.path.join('static', 'captures')
+        os.makedirs(capture_dir, exist_ok=True)
+        
+        img_save_path = os.path.join(capture_dir, img_filename)
+        data_save_path = os.path.join(capture_dir, data_filename)
+        
+        cv2.imwrite(img_save_path, processed_img)
+        
+        with open(data_save_path, 'w') as f:
+            json.dump(report_data, f, indent=4)
+            
+        print(f"✅ Capture saved: {img_filename} and {data_filename}")
+
+    # BUG 4 FIX: Add a timestamp as a query parameter to the URLs
+    # to act as a "cache buster", forcing the browser to load the new file.
+    cache_buster = int(time.time())
 
     return jsonify({
         "success": True,
         # We use relative URLs for the frontend
-        "image_url": f"static/captures/{img_filename}",
-        "data_url": f"static/captures/{data_filename}",
+        "image_url": f"static/captures/{img_filename}?t={cache_buster}",
+        "data_url": f"static/captures/{data_filename}?t={cache_buster}",
         "data": report_data
     })
 

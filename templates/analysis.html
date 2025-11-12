@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eye Analysis - Dashboard</title>
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --primary-blue: #007bff;
+            --primary-blue-dark: #0056b3;
+            --light-gray: #f8f9fa;
+            --border-color: #dee2e6;
+            --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            --text-dark: #343a40;
+            --text-light: #6c757d;
+            --status-red: #dc3545;
+            --status-green: #28a745;
+            --status-yellow: #ffc107;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            background-color: var(--light-gray);
+            color: var(--text-dark);
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background-color: #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .nav-brand {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary-blue);
+            display: flex;
+            align-items: center;
+        }
+
+        .nav-brand i {
+            margin-right: 0.5rem;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-light);
+            font-weight: 500;
+            margin-left: 1.5rem;
+            padding: 0.5rem 0;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a.active,
+        .nav-links a:hover {
+            color: var(--primary-blue);
+            border-bottom: 2px solid var(--primary-blue);
+        }
+
+        .btn {
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-blue);
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-blue-dark);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .card {
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            box-shadow: var(--card-shadow);
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .card-header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-header h2 {
+            margin: 0;
+            font-size: 1.25rem;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .stat-card-lg {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .stat-card-lg .icon {
+            font-size: 2.5rem;
+            padding: 1rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-card-lg .icon.green {
+            color: var(--status-green);
+            background-color: #e2f5e8;
+        }
+
+        .stat-card-lg .icon.blue {
+            color: var(--primary-blue);
+            background-color: #e0f0ff;
+        }
+
+        .stat-card-lg .icon.yellow {
+            color: var(--status-yellow);
+            background-color: #fff8e0;
+        }
+
+        .stat-card-lg .icon.red {
+            color: var(--status-red);
+            background-color: #fde8e8;
+        }
+
+        .stat-card-lg .info {
+            text-align: right;
+        }
+
+        .stat-card-lg .info-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-light);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card-lg .info-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .stat-card-lg .info-detail {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 0.25rem;
+        }
+
+        .stat-card-lg .info-detail.positive {
+            color: var(--status-green);
+        }
+
+        .stat-card-lg .info-detail.negative {
+            color: var(--status-red);
+        }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .chart-container {
+            height: 400px;
+            position: relative;
+        }
+
+        /* History List */
+        .history-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-item img {
+            width: 200px;
+            height: auto;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .history-info {
+            flex-grow: 1;
+        }
+
+        .history-info h3 {
+            margin: 0 0 0.5rem 0;
+        }
+
+        .history-info p {
+            margin: 0.25rem 0;
+            color: var(--text-light);
+        }
+
+        .history-info a {
+            font-weight: 600;
+            color: var(--primary-blue);
+            text-decoration: none;
+            margin-right: 1rem;
+        }
+
+        .history-info a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 992px) {
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav>
+        <div class="nav-brand">
+            <i class='bx bx-show-alt'></i>
+            <span>CorneaSense</span>
+        </div>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/analysis" class="active">Analysis</a>
+        </div>
+        <a href="#" class="btn btn-primary">Export Report</a>
+    </nav>
+
+    <div class="container">
+
+        <div class="dashboard-grid">
+            <div class="card stat-card-lg">
+                <div class="icon green"><i class='bx bx-scan'></i></div>
+                <div class="info">
+                    <div class="info-title">Total Captures</div>
+                    <div class="info-value" id="stat-total-captures">0</div>
+                    <div class="info-detail" id="stat-total-detail">...</div>
+                </div>
+            </div>
+            <div class="card stat-card-lg">
+                <div class="icon blue"><i class='bx bx-unite'></i></div>
+                <div class="info">
+                    <div class="info-title">Avg. Asymmetry</div>
+                    <div class="info-value" id="stat-avg-asymmetry">0%</div>
+                    <div class="info-detail">Across all captures</div>
+                </div>
+            </div>
+            <div class="card stat-card-lg">
+                <div class="icon yellow"><i class='bx bx-droplet'></i></div>
+                <div class="info">
+                    <div class="info-title">Dryness Alerts</div>
+                    <div class="info-value" id="stat-dryness-alerts">0</div>
+                    <div class="info-detail">Dryness Index > 10</div>
+                </div>
+            </div>
+            <div class="card stat-card-lg">
+                <div class="icon red"><i class='bx bxs-eyedropper'></i></div>
+                <div class="info">
+                    <div class="info-title">Sclera Redness Alerts</div>
+                    <div class="info-value" id="stat-redness-alerts">0</div>
+                    <div class="info-detail">Redness Index > 1.2</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Pupil Asymmetry Over Time</h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="symmetryChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h2>Event Distribution</h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="eventsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 1.5rem;">
+            <div class="card-header">
+                <h2>Capture History</h2>
+            </div>
+            <div class="history-list" id="history-list-container">
+                <p style="text-align: center; color: var(--text-light);">Loading history...</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Chart.js instances (global to be updated)
+        let symmetryChart = null;
+        let eventsChart = null;
+
+        // --- HELPER FUNCTIONS ---
+
+        /**
+         * Calculates asymmetry percentage for a single data record.
+         */
+        function getAsymmetry(data) {
+            // This check is already robust, which is good.
+            if (!data || data.error || !data.left_eye_report || !data.right_eye_report) {
+                return 0;
+            }
+            const leftPupil = data.left_eye_report.pupil_diameter_px;
+            const rightPupil = data.right_eye_report.pupil_diameter_px;
+            const diff = Math.abs(leftPupil - rightPupil);
+            const avg = (leftPupil + rightPupil) / 2;
+            return (avg === 0) ? 0 : ((diff / avg) * 100);
+        }
+
+        /**
+         * Updates the 4 summary stat cards.
+         */
+        function updateStatCards(allData) {
+            const totalCaptures = allData.length;
+
+            // Calculate Avg Asymmetry
+            const totalAsymmetry = allData.reduce((sum, data) => sum + getAsymmetry(data), 0);
+            const avgAsymmetry = totalCaptures > 0 ? (totalAsymmetry / totalCaptures) : 0;
+
+            // Calculate Alerts (using sample thresholds)
+            let drynessAlerts = 0;
+            let rednessAlerts = 0;
+
+            allData.forEach(data => {
+                // **FIX 1: Add a robust check to skip bad/malformed data**
+                if (!data || data.error || !data.left_eye_report || !data.right_eye_report) {
+                    return; // Skip this record
+                }
+
+                // Now this code is safe
+                if (data.left_eye_report.dryness_index > 10 || data.right_eye_report.dryness_index > 10) {
+                    drynessAlerts++;
+                }
+                if (data.left_eye_report.redness_index > 1.2 || data.right_eye_report.redness_index > 1.2) {
+                    rednessAlerts++;
+                }
+            });
+
+            document.getElementById('stat-total-captures').textContent = totalCaptures;
+            document.getElementById('stat-total-detail').textContent = 'Valid captures processed';
+            document.getElementById('stat-avg-asymmetry').textContent = `${avgAsymmetry.toFixed(1)}%`;
+            document.getElementById('stat-dryness-alerts').textContent = drynessAlerts;
+            document.getElementById('stat-redness-alerts').textContent = rednessAlerts;
+        }
+
+        /**
+         * Renders the two charts with processed data.
+         * Expects 'allData' to be in newest-first order.
+         */
+        function renderCharts(allData) {
+            // --- 1. Symmetry Line Chart ---
+            const chronoData = [...allData].reverse(); // Reverse for chronological view
+
+            const labels = chronoData.map(d => new Date(d.timestamp).toLocaleString());
+            const symmetryDataPoints = chronoData.map(d => getAsymmetry(d));
+
+            const ctxLine = document.getElementById('symmetryChart').getContext('2d');
+            if (symmetryChart) symmetryChart.destroy(); // Clear old chart
+            symmetryChart = new Chart(ctxLine, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Asymmetry %',
+                            data: symmetryDataPoints,
+                            borderColor: 'var(--primary-blue)',
+                            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                        },
+                        {
+                            label: 'Alert Threshold (15%)',
+                            data: labels.map(() => 15),
+                            borderColor: 'var(--status-red)',
+                            borderDash: [5, 5],
+                            fill: false,
+                            pointRadius: 0,
+                        }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // --- 2. Events Donut Chart ---
+            let normal = 0;
+            let asymmetryAlerts = 0;
+            let rednessAlerts = 0;
+            let drynessAlerts = 0;
+
+            allData.forEach(data => {
+                // **FIX 2: Add a robust check here as well**
+                if (!data || data.error || !data.left_eye_report || !data.right_eye_report) {
+                    return; // Skip this record
+                }
+
+                let isAlert = false;
+                if (getAsymmetry(data) > 15) { // getAsymmetry is already safe
+                    asymmetryAlerts++;
+                    isAlert = true;
+                }
+                // Now this code is safe
+                if (data.left_eye_report.redness_index > 1.2 || data.right_eye_report.redness_index > 1.2) {
+                    rednessAlerts++;
+                    isAlert = true;
+                }
+                if (data.left_eye_report.dryness_index > 10 || data.right_eye_report.dryness_index > 10) {
+                    drynessAlerts++;
+                    isAlert = true;
+                }
+                if (!isAlert) {
+                    normal++;
+                }
+            });
+
+            const ctxDonut = document.getElementById('eventsChart').getContext('2d');
+            if (eventsChart) eventsChart.destroy(); // Clear old chart
+            eventsChart = new Chart(ctxDonut, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Normal', 'Asymmetry', 'Redness', 'Dryness'],
+                    datasets: [{
+                        data: [normal, asymmetryAlerts, rednessAlerts, drynessAlerts],
+                        backgroundColor: [
+                            '#4BC0C0', // New Color 1 (Teal)
+                            '#9966FF', // New Color 2 (Purple)
+                            '#FF9F40', // New Color 3 (Orange)
+                            '#36A2EB', // New Color 4 (Blue)
+                        ],
+                        borderColor: '#ffffff',
+                        borderWidth: 3
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        /**
+         * Populates the list of historical captures.
+         * Expects 'captures' from the /get_captures endpoint.
+         */
+        function populateHistoryList(captures) {
+            const container = document.getElementById('history-list-container');
+            if (captures.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-light);">No captures found in history.</p>';
+                return;
+            }
+
+            container.innerHTML = ''; // Clear 'loading'
+
+            captures.forEach(capture => {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+
+                item.innerHTML = `
+                        <img src="${capture.image_url}" alt="Capture preview">
+                        <div class="history-info">
+                            <h3>Capture: ${capture.display_time}</h3>
+                            <p>${capture.timestamp}</p>
+                            <div>
+                                <a href="${capture.image_url}" target="_blank">View Image</a>
+                                <a href="${capture.json_url}" target="_blank">View JSON</a>
+                            </div>
+                        </div>
+                    `;
+                container.appendChild(item);
+            });
+        }
+
+        /**
+         * Main function to load all dashboard data.
+         */
+        async function loadDashboardData() {
+            try {
+                // 1. Fetch the list of all captures
+                const listResponse = await fetch('/get_captures');
+                if (!listResponse.ok) throw new Error('Failed to fetch capture list.');
+
+                const captures = await listResponse.json(); // This is the list from your backend
+
+                if (captures.length === 0) {
+                    console.log("No captures found.");
+                    updateStatCards([]);
+                    renderCharts([]); // Render empty charts
+                    populateHistoryList([]);
+                    return;
+                }
+
+                // 2. Create an array of fetch promises for each JSON file
+                const dataPromises = captures.map(capture =>
+                    fetch(capture.json_url)
+                        .then(res => res.json())
+                        .catch(err => ({ error: `Failed to load ${capture.json_url}` }))
+                );
+
+                // 3. Wait for all JSON files to be fetched
+                const allData = await Promise.all(dataPromises);
+
+                // 4. Filter out any captures that failed analysis (had an "error" key)
+                const validData = allData.filter(d => !d.error);
+
+                // 5. Populate all UI components with the data
+                updateStatCards(validData);
+                renderCharts(validData); // Data is newest-first, which is fine
+                populateHistoryList(captures); // Use original list for URLs
+
+            } catch (error) {
+                console.error("Failed to load dashboard data:", error);
+                document.getElementById('history-list-container').innerHTML =
+                    `<p style="text-align: center; color: var(--status-red);">Error loading dashboard data: ${error.message}</p>`;
+            }
+        }
+
+        // --- RUN ON PAGE LOAD ---
+        document.addEventListener('DOMContentLoaded', loadDashboardData);
+
+    </script>
+
+</body>
+
+</html>
